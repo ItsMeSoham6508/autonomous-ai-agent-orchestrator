@@ -1,8 +1,8 @@
 from http import HTTPStatus
-
 from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import JSONResponse
-
+from app.ai.config_parser import config_parser, config_save
+from app.ai.ollama_client import OllamaClient
 from app.dto.application_response_dto import ApplicationResponseDto
 from app.dto.register_application_dto import RegisterApplicationDto
 from app.dto.update_application_dto import UpdateApplicationDto
@@ -94,3 +94,28 @@ async def delete_application(id: int):
         message="Application deleted",
         status=HTTPStatus.OK,
     )
+
+@app.get(
+    "/ai",
+    response_model=StandardResponse[str]
+)
+async def get_response(file_path: str, prompt: str):
+    print(file_path)
+    config = config_parser(file_path=file_path)
+    if (config["provider"] == "ollama"):
+        ai = OllamaClient(config["role"], config["instructions"], config["history"], config["model"])
+        response = await ai.generate_response(
+            {
+                "prompt": prompt
+            }
+        )
+
+        config_save(file_path=file_path, message=prompt, role="user")
+        config_save(file_path=file_path, message=response, role="ai")
+        
+
+        return StandardResponse(
+            data=response,
+            message="Successfully queried ai",
+            status=HTTPStatus.OK
+        )
