@@ -1,10 +1,8 @@
 import os
 from typing import override
-
 import httpx
-
 from app.ai.llm_client import LLMClient
-
+from app.enums.tool import Tool
 
 class OllamaClient(LLMClient):
     def __init__(
@@ -35,10 +33,26 @@ class OllamaClient(LLMClient):
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 self.base_url + "/api/chat",
-                json={"model": self.model, "messages": messages, "stream": False},
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": 0},
+                },
             )
         response.raise_for_status()
         content = response.json()["message"]["content"]
         if not content:
             raise RuntimeError("Ollama returned an empty response")
         return content
+
+    @override
+    async def run_tool(self, tool_type: Tool, inputs):
+        if (tool_type == Tool.WEB_SEARCH):
+            formatted_inputs = {
+                "query": inputs
+            }
+
+        return await super().run_tool(tool_type, formatted_inputs)
+
+    

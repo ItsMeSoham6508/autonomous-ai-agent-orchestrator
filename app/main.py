@@ -1,8 +1,10 @@
 from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import JSONResponse
+from pydantic import Json
 from app.ai.config_parser import config_parser, config_save
 from app.ai.ollama_client import OllamaClient
+from app.ai_tools.search_engine import Search
 from app.dto.application_response_dto import ApplicationResponseDto
 from app.dto.register_application_dto import RegisterApplicationDto
 from app.dto.update_application_dto import UpdateApplicationDto
@@ -119,3 +121,20 @@ async def get_response(file_path: str, prompt: str):
             message="Successfully queried ai",
             status=HTTPStatus.OK
         )
+
+
+@app.get(
+    "/search",
+    response_model=StandardResponse
+)
+async def search(q: str):
+    s = Search()
+    result = await s.search_json_format(q)
+
+    return StandardResponse(
+        data=result,
+        message="Successfully queried searxng",
+        status=HTTPStatus.OK
+    )
+
+    
