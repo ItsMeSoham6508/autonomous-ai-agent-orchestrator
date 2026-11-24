@@ -13,7 +13,7 @@ def config_save(file_path: str, message, role):
 
     new = {
         "role": role,
-        "message": message
+        "content": message
     }
     config["agent_config"]["history"].append(new)
 

@@ -1,6 +1,7 @@
 from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import JSONResponse
+from ollama import ChatResponse
 from pydantic import Json
 from app.ai.config_parser import config_parser, config_save
 from app.ai.ollama_client import OllamaClient
@@ -110,11 +111,10 @@ async def get_response(file_path: str, prompt: str):
             {
                 "prompt": prompt
             }
-        )
+        )   
 
-        config_save(file_path=file_path, message=prompt, role="user")
-        config_save(file_path=file_path, message=response, role="ai")
-        
+        config_save(file_path=file_path, message=prompt, role='user')
+        config_save(file_path=file_path, message=response, role='assistant')
 
         return StandardResponse(
             data=response,

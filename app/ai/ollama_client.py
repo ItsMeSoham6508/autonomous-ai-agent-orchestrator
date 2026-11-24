@@ -1,8 +1,14 @@
 import os
-from typing import override
+from typing import List, override
 import httpx
+from ollama import ChatResponse, chat
+from pydantic import BaseModel
+from app.ai.config_parser import config_save
 from app.ai.llm_client import LLMClient
 from app.enums.tool import Tool
+
+class ToolResponse(BaseModel):
+    tools_needed: List[Tool]
 
 class OllamaClient(LLMClient):
     def __init__(
@@ -16,35 +22,23 @@ class OllamaClient(LLMClient):
 
     @override
     async def generate_response(self, inputs):
-        messages = [{"role": "system", "content": f"{self.role}\n{self.instructions}"}]
-        messages.extend(
-            {
-                "role": "assistant" if item["role"] == "ai" else item["role"],
-                "content": item["message"],
-            }
-            for item in self.history
-            if isinstance(item, dict)
-            and item.get("role") in {"user", "ai", "assistant"}
-            and isinstance(item.get("message"), str)
-            and item["message"]
-        )
-        messages.append({"role": "user", "content": inputs["prompt"]})
+        self.history.append({"role": "user", "content": inputs["prompt"]})
+        tools_needed = await self.desire_run_tool(inputs['prompt'], self.history)
 
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(
-                self.base_url + "/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {"temperature": 0},
-                },
-            )
-        response.raise_for_status()
-        content = response.json()["message"]["content"]
-        if not content:
+        response: ChatResponse = chat(
+            model=self.model,
+            messages=self.history,
+            options={
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 20,
+                "repeat_penalty": 1.05,
+                "num_ctx": 16384
+            }
+        )
+        if not response:
             raise RuntimeError("Ollama returned an empty response")
-        return content
+        return response.message.content
 
     @override
     async def run_tool(self, tool_type: Tool, inputs):
@@ -54,5 +48,27 @@ class OllamaClient(LLMClient):
             }
 
         return await super().run_tool(tool_type, formatted_inputs)
+
+    @override
+    async def desire_run_tool(self, prompt: str, messages):
+        tool_list = [Tool.WEB_SEARCH]
+        prmpt = f"""
+        You are given the following tools: {str(tool_list)}
+        You may choose which ones you want to fulfill this users request: {str(messages)}
+        """
+        print(prmpt)
+        tool_response: ChatResponse = chat(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": prmpt
+                }
+            ],
+            format=ToolResponse.model_json_schema()
+        )
+        return tool_response.message.content
+
+        
 
     

@@ -24,6 +24,6 @@ class LLMClient(ABC):
             results = search.search_json_format(inputs['query'])
             return results
 
-    
+    @abstractmethod
     async def desire_run_tool(self, prompt: str):
         pass
